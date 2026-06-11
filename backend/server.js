@@ -4,14 +4,14 @@ const dotenv = require("dotenv");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const errorHandler = require("./middleware/errorHandler");
+const connectDB = require("./config/database");
 
-// Routes disabled - using localStorage instead
-// const authRoutes = require("./routes/auth");
-// const chatRoutes = require("./routes/chat");
+const authRoutes = require("./routes/auth");
+const chatRoutes = require("./routes/chat");
 
 dotenv.config();
 
-// MongoDB connection removed - using localStorage instead
+connectDB();
 
 const app = express();
 
@@ -33,17 +33,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {
-  res.send("?? Parth AI Backend Running - Using localStorage");
+  res.send("🚀 Parth AI Backend Running");
 });
 
-// Routes disabled - using localStorage instead
-// app.use("/api/auth", authRoutes);
-// app.use("/api/chat", chatRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/chat", chatRoutes);
 
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`?? Parth AI Server running on port ${PORT}`);
+  console.log(`🚀 Parth AI Server running on port ${PORT}`);
 });

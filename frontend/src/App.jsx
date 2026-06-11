@@ -1,9 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
 import Settings from './pages/Settings';
+import Profile from './pages/Profile';
+import About from './pages/About';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
 import Models from './pages/Models';
@@ -43,6 +46,7 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={
             <PublicRoute>
               <Login />
@@ -78,7 +82,16 @@ function App() {
               <Settings />
             </ProtectedRoute>
           } />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } />
+          <Route path="/about" element={
+            <ProtectedRoute>
+              <About />
+            </ProtectedRoute>
+          } />
         </Routes>
       </Router>
       <Toaster position="top-right" />

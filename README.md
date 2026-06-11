@@ -185,6 +185,8 @@ parth-ai/
 │   ├── routes/
 │   │   ├── auth.js
 │   │   └── chat.js
+│   ├── services/
+│   │   └── openrouterService.js
 │   ├── uploads/
 │   ├── server.js
 │   ├── package.json
@@ -198,10 +200,16 @@ parth-ai/
 │   │   ├── contexts/
 │   │   │   └── AuthContext.jsx
 │   │   ├── pages/
+│   │   │   ├── Landing.jsx
 │   │   │   ├── Login.jsx
 │   │   │   ├── Register.jsx
 │   │   │   ├── Chat.jsx
-│   │   │   └── Settings.jsx
+│   │   │   ├── Settings.jsx
+│   │   │   ├── Profile.jsx
+│   │   │   ├── About.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── Analytics.jsx
+│   │   │   └── Models.jsx
 │   │   ├── services/
 │   │   │   └── api.js
 │   │   ├── App.jsx

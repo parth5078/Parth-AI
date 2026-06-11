@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getChats, saveChat, getChatById, deleteChat as deleteChatStorage } from '../services/localStorage';
-import axios from 'axios';
+import { chatAPI } from '../services/api';
 import { Send, Plus, Trash2, Settings, LogOut, MessageSquare, Sparkles, Bot } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
@@ -39,51 +38,43 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const loadChats = () => {
+  const loadChats = async () => {
     try {
-      const userChats = getChats(user?.id);
-      setChats(userChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+      const response = await chatAPI.getChats();
+      setChats(response.data);
     } catch (error) {
       toast.error('Failed to load chats');
     }
   };
 
-  const loadChat = (chatId) => {
+  const loadChat = async (chatId) => {
     try {
-      const chat = getChatById(chatId, user?.id);
-      if (chat) {
-        setCurrentChat(chat);
-      } else {
-        toast.error('Chat not found');
-      }
+      const response = await chatAPI.getChat(chatId);
+      setCurrentChat(response.data);
     } catch (error) {
       toast.error('Failed to load chat');
     }
   };
 
-  const createNewChat = () => {
+  const createNewChat = async () => {
     try {
-      const newChat = {
-        id: 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2),
-        userId: user?.id,
+      const response = await chatAPI.createChat({
         title: 'New Chat',
         model: selectedModel,
-        language: user?.preferences?.language || 'english',
-        messages: []
-      };
-      saveChat(newChat);
-      setCurrentChat(newChat);
+        language: user?.preferences?.language || 'english'
+      });
+      setCurrentChat(response.data);
       loadChats();
     } catch (error) {
       toast.error('Failed to create chat');
     }
   };
 
-  const deleteChat = (chatId, e) => {
+  const deleteChat = async (chatId, e) => {
     e.stopPropagation();
     try {
-      deleteChatStorage(chatId, user?.id);
-      if (currentChat?.id === chatId) {
+      await chatAPI.deleteChat(chatId);
+      if (currentChat?._id === chatId) {
         setCurrentChat(null);
       }
       loadChats();
@@ -101,151 +92,18 @@ export default function Chat() {
     setLoading(true);
 
     try {
-      let chat = currentChat;
-      
-      if (!chat) {
-        chat = {
-          id: 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2),
-          userId: user?.id,
-          title: userMessage.substring(0, 50) + (userMessage.length > 50 ? '...' : 'New Chat'),
-          model: selectedModel,
-          language: user?.preferences?.language || 'english',
-          messages: []
-        };
-      }
+      const response = await chatAPI.sendMessage({
+        chatId: currentChat?._id,
+        message: userMessage,
+        model: selectedModel,
+        language: user?.preferences?.language || 'english'
+      });
 
-      const userMessageContent = {
-        role: 'user',
-        content: userMessage,
-        timestamp: new Date().toISOString()
-      };
-
-      // Add files to message if present
-      if (uploadedFiles.length > 0) {
-        userMessageContent.files = uploadedFiles;
-      }
-
-      const updatedChat = {
-        ...chat,
-        messages: [...(chat.messages || []), userMessageContent]
-      };
-
-      setCurrentChat(updatedChat);
-
-      const getSystemPrompt = (language) => {
-        const languagePrompts = {
-          english: `You are ParthAI.
-
-Rules:
-- Introduce yourself as ParthAI when asked.
-- Be friendly and professional.
-- Help with coding, internships, careers, AI, web development and general questions.
-- Use simple English.
-- Use bullet points when helpful.
-- Avoid HTML tags.
-- Avoid markdown tables.
-- Give clean and readable answers.`,
-          gujarati: `You are ParthAI.
-
-Rules:
-- Introduce yourself as ParthAI when asked.
-- Be friendly and professional.
-- Help with coding, internships, careers, AI, web development and general questions.
-- Respond in Gujarati when the user speaks Gujarati.
-- Use bullet points when helpful.
-- Avoid HTML tags.
-- Avoid markdown tables.
-- Give clean and readable answers.`,
-          hindi: `You are ParthAI.
-
-Rules:
-- Introduce yourself as ParthAI when asked.
-- Be friendly and professional.
-- Help with coding, internships, careers, AI, web development and general questions.
-- Respond in Hindi when the user speaks Hindi.
-- Use bullet points when helpful.
-- Avoid HTML tags.
-- Avoid markdown tables.
-- Give clean and readable answers.`
-        };
-        
-        return languagePrompts[language] || languagePrompts.english;
-      };
-
-      // Check for image generation command
-      const imageGenRegex = /^(generate image|create image|draw|paint|make an image|image:)/i;
-      const isImageGeneration = imageGenRegex.test(userMessage);
-
-      let aiResponse;
-
-      if (isImageGeneration) {
-        // Extract the prompt for image generation
-        const imagePrompt = userMessage.replace(imageGenRegex, '').trim() || userMessage;
-        
-        try {
-          // Use a free image generation API (Pollinations.ai)
-          const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1024&height=1024&nologo=true`;
-          
-          aiResponse = `I've generated an image based on your request: "${imagePrompt}"\n\n![Generated Image](${imageUrl})`;
-        } catch (imgError) {
-          console.error('Image generation error:', imgError);
-          aiResponse = 'Sorry, I encountered an error generating the image. Please try again.';
-        }
-      } else {
-        // Regular chat with OpenRouter
-        const messagesToSend = updatedChat.messages.map(msg => {
-          let content = msg.content;
-          // Add file information to the message
-          if (msg.files && msg.files.length > 0) {
-            const fileNames = msg.files.map(f => f.name).join(', ');
-            content += `\n\n[Attached files: ${fileNames}]`;
-          }
-          return {
-            role: msg.role,
-            content: content
-          };
-        });
-
-        const response = await axios.post(
-          'https://openrouter.ai/api/v1/chat/completions',
-          {
-            model: updatedChat.model,
-            messages: [
-              {
-                role: 'system',
-                content: getSystemPrompt(updatedChat.language)
-              },
-              ...messagesToSend
-            ]
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
-              'Content-Type': 'application/json',
-              'HTTP-Referer': window.location.origin,
-              'X-Title': 'ParthAI'
-            }
-          }
-        );
-
-        aiResponse = response.data.choices[0].message.content;
-      }
-
-      const finalChat = {
-        ...updatedChat,
-        messages: [...updatedChat.messages, {
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: new Date().toISOString()
-        }]
-      };
-
-      saveChat(finalChat);
-      setCurrentChat(finalChat);
+      setCurrentChat(response.data.chat);
       loadChats();
     } catch (error) {
-      console.error('OpenRouter Error:', error.response?.data || error.message);
-      toast.error(error.response?.data?.error?.message || 'Something went wrong');
+      console.error('Error:', error.response?.data || error.message);
+      toast.error(error.response?.data?.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -284,7 +142,7 @@ Rules:
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <ChatSidebar
-        currentChatId={currentChat?.id}
+        currentChatId={currentChat?._id}
         onChatSelect={loadChat}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}

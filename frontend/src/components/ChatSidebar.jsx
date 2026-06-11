@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Settings, LogOut, MessageSquare, LayoutDashboard, BarChart3, Cpu, Bell, Search, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getChats, saveChat, deleteChat as deleteChatStorage } from '../services/localStorage';
+import { chatAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import Logo from './Logo';
 
@@ -17,10 +17,10 @@ export default function ChatSidebar({ currentChatId, onChatSelect, isOpen, onTog
     loadChats();
   }, []);
 
-  const loadChats = () => {
+  const loadChats = async () => {
     try {
-      const userChats = getChats(user?.id);
-      setChats(userChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+      const response = await chatAPI.getChats();
+      setChats(response.data);
     } catch (error) {
       console.error('Failed to load chats:', error);
     } finally {
@@ -28,18 +28,14 @@ export default function ChatSidebar({ currentChatId, onChatSelect, isOpen, onTog
     }
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
     try {
-      const newChat = {
-        id: 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2),
-        userId: user?.id,
+      const response = await chatAPI.createChat({
         title: 'New Chat',
         model: user?.preferences?.model || 'openai/gpt-oss-120b:free',
-        language: user?.preferences?.language || 'english',
-        messages: []
-      };
-      saveChat(newChat);
-      onChatSelect(newChat.id);
+        language: user?.preferences?.language || 'english'
+      });
+      onChatSelect(response.data._id);
       loadChats();
       setActiveMenu('conversations');
       toast.success('New chat created');
@@ -48,10 +44,10 @@ export default function ChatSidebar({ currentChatId, onChatSelect, isOpen, onTog
     }
   };
 
-  const handleDeleteChat = (e, chatId) => {
+  const handleDeleteChat = async (e, chatId) => {
     e.stopPropagation();
     try {
-      deleteChatStorage(chatId, user?.id);
+      await chatAPI.deleteChat(chatId);
       toast.success('Chat deleted');
       loadChats();
       if (currentChatId === chatId) {
@@ -146,10 +142,10 @@ export default function ChatSidebar({ currentChatId, onChatSelect, isOpen, onTog
               <div className="space-y-2">
                 {chats.map((chat) => (
                   <div
-                    key={chat.id}
-                    onClick={() => onChatSelect(chat.id)}
+                    key={chat._id}
+                    onClick={() => onChatSelect(chat._id)}
                     className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                      currentChatId === chat.id
+                      currentChatId === chat._id
                         ? 'bg-primary/20 text-white border border-primary/30'
                         : 'hover:bg-white/5 text-text-muted hover:text-white'
                     }`}
@@ -157,7 +153,7 @@ export default function ChatSidebar({ currentChatId, onChatSelect, isOpen, onTog
                     <MessageSquare size={16} />
                     <span className="flex-1 truncate text-sm">{chat.title}</span>
                     <button
-                      onClick={(e) => handleDeleteChat(e, chat.id)}
+                      onClick={(e) => handleDeleteChat(e, chat._id)}
                       className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 rounded-lg transition-all"
                     >
                       <Trash2 size={14} className="text-red-400" />
